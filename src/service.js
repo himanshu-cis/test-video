@@ -4,6 +4,11 @@ import "firebase/firestore";
 export default class Service {
     db;
     storage;
+
+    constructor() {
+        this.init();
+    }
+
     init() {
         const firebaseConfig = {
             apiKey: "AIzaSyA3Bhx-gnQFgZDbNdnrMa4ow0t0mshW3k8",
@@ -16,18 +21,55 @@ export default class Service {
             measurementId: "G-DWTZN1CZ8J"
         };
 
-        // Initialize Firebase
-        this.firebase.initializeApp(firebaseConfig);
-        this.db = this.firebase.firestore();
+        if (!firebase.apps.length) {
+            // Initialize Firebase
+            firebase.initializeApp(firebaseConfig);
+        }
+        this.db = firebase.firestore();
+        // this.storage = firebase.storage().ref();
     }
 
-    addVideo() {
-        this.db.collection('videos').add({
-            title: 'test',
-            videoLink: '',
+    async addVideo({
+        file, title
+    }) {
+        return this.db.collection('videos').add({
+            title,
+            file,
             created_at: Date.now()
-        });
+        })
+        .then(doc => {
+            if(doc.id) {
+                return doc
+            } else {
+                return {}
+            }
+        })
+        .catch(console.log)
     }
 
-    _storeVideo() {}
+    getAll() {
+        return this.db.collection("videos")
+            .get()
+            .then((querySnapshot) => {
+                let docs = [];
+                querySnapshot.forEach((doc) => {
+                    docs.push({
+                        ...doc.data(),
+                        id: doc.id
+                    })
+                });
+
+                return docs;
+            })
+            .catch(console.log)
+    }
+
+
+    _storeVideo(file) {
+        return this.storage.put(file)
+            .then(function (snapshot) {
+                return snapshot;
+            })
+            .catch(console.log)
+    }
 }
