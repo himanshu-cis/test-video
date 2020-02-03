@@ -1,75 +1,85 @@
 import * as firebase from "firebase/app";
-import "firebase/firestore";
+import "firebase/database";
+import "firebase/storage"
 
-export default class Service {
-    db;
-    storage;
 
-    constructor() {
-        this.init();
-    }
+const firebaseConfig = {
+    apiKey: "AIzaSyA3Bhx-gnQFgZDbNdnrMa4ow0t0mshW3k8",
+    authDomain: "test-video-78f00.firebaseapp.com",
+    databaseURL: "https://test-video-78f00.firebaseio.com/",
+    projectId: "test-video-78f00",
+    storageBucket: "gs://test-video-78f00.appspot.com",
+    messagingSenderId: "821737185474",
+    appId: "1:821737185474:web:5c367a17f9644023021b5b",
+    measurementId: "G-DWTZN1CZ8J"
+};
 
-    init() {
-        const firebaseConfig = {
-            apiKey: "AIzaSyA3Bhx-gnQFgZDbNdnrMa4ow0t0mshW3k8",
-            authDomain: "test-video-78f00.firebaseapp.com",
-            databaseURL: "https://test-video-78f00.firebaseio.com",
-            projectId: "test-video-78f00",
-            storageBucket: "test-video-78f00.appspot.com",
-            messagingSenderId: "821737185474",
-            appId: "1:821737185474:web:5c367a17f9644023021b5b",
-            measurementId: "G-DWTZN1CZ8J"
-        };
+if (!firebase.apps.length) {
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.database().ref('/videos/');
+const storage = firebase.storage();
+const root = storage.ref();
 
-        if (!firebase.apps.length) {
-            // Initialize Firebase
-            firebase.initializeApp(firebaseConfig);
-        }
-        this.db = firebase.firestore();
-        // this.storage = firebase.storage().ref();
-    }
 
-    async addVideo({
+const _storeVideo = function (file, title) {
+    return root.child(title).put(file);
+}
+
+export default {
+    getAll: (resource, params) => {
+        return db.once('value')
+            .then(refernece => {
+                let dd = refernece.child("/rows/").val();
+                let doc = [];
+                for (let a in dd) {
+                    doc.push({
+                        _id: a,
+                        ...dd[a]
+                    });
+                }
+
+                return {
+                    data: doc,
+                    total: doc.length
+                }
+            })
+
+    },
+    create: ({
         file, title
-    }) {
-        return this.db.collection('videos').add({
-            title,
-            file,
-            created_at: Date.now()
-        })
-        .then(doc => {
-            if(doc.id) {
-                return doc
-            } else {
-                return {}
-            }
-        })
-        .catch(console.log)
-    }
+    }) => {
+        let filePath = 'videos/' + Date.now() + '-' + file.title;
+        return _storeVideo(file.rawFile, filePath)
+            .then(snapshot => {
+                return root.child(filePath).getDownloadURL()
+                    .then(file => {
+                        let row = db.child('rows').push()
+                        let create = {
+                            id: Date.now(),
+                            title,
+                            file: file,
+                            created_at: Date.now()
+                        };
+                        row.set(create);
 
-    getAll() {
-        return this.db.collection("videos")
-            .get()
-            .then((querySnapshot) => {
-                let docs = [];
-                querySnapshot.forEach((doc) => {
-                    docs.push({
-                        ...doc.data(),
-                        id: doc.id
+                        return create;
                     })
-                });
-
-                return docs;
             })
-            .catch(console.log)
-    }
+            .catch((error) => {
+                throw new Error({ message: error.message_, status: 401 })
+            });
 
-
-    _storeVideo(file) {
-        return this.storage.put(file)
-            .then(function (snapshot) {
-                return snapshot;
-            })
-            .catch(console.log)
-    }
+    },
+    getOne: (id) => {
+        return db.child('rows').limitToLast(100)
+    },
+    update: (id, data) => {
+        let updated = db.child('rows/'+id).set(data);
+        console.log("TCL: data", updated);
+        return {
+            data: updated
+        }
+    },
 }
